@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AuthentiCapture">
+    <title>AuthentiCapture - Luxury Item Authentication</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDE4MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiByeD0iNDAiIGZpbGw9IiMwZjE3MmEiLz4KPHN2ZyB4PSI0NSIgeT0iNDUiIHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2MzY2ZjEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KPHA+PGNpcmNsZSBjeD0iMTEiIGN5PSIxMSIgcj0iOCIvPjwvcD4KPHA+PHBhdGggZD0ibTIxIDIxLTQuMzUtNC4zNSIvPjwvcD4KPC9zdmc+Cjwvc3ZnPg==">
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: system-ui, -apple-system, sans-serif;
+            overscroll-behavior: none;
+            touch-action: manipulation;
+        }
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useCallback } = React;
+        const { Camera, Check, X, RotateCcw, Eye, AlertCircle, CheckCircle, ArrowLeft, ArrowRight } = lucideReact;
+
+        const LuxuryAuthApp = () => {
+            const [selectedCategory, setSelectedCategory] = useState(null);
+            const [currentStep, setCurrentStep] = useState(0);
+            const [capturedPhotos, setCapturedPhotos] = useState({});
+            const [isCapturing, setIsCapturing] = useState(false);
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const streamRef = useRef(null);
+
+            // Item categories and their required photo steps
+            const itemCategories = {
+                watch: {
+                    name: "Luxury Watch",
+                    icon: "⌚",
+                    steps: [
+                        {
+                            id: "face_front",
+                            title: "Watch Face - Front View",
+                            description: "Capture the entire watch face straight on. Ensure the dial, hands, and markers are clearly visible.",
+                            tips: ["Use natural lighting", "Keep watch flat", "Fill the frame", "Check for reflections"]
+                        },
+                        {
+                            id: "serial_number",
+                            title: "Serial Number",
+                            description: "Locate and photograph the serial number (usually on case back or between lugs at 12 o'clock).",
+                            tips: ["Use macro mode", "Ensure sharp focus", "Good lighting essential", "Number must be legible"]
+                        },
+                        {
+                            id: "case_back",
+                            title: "Case Back",
+                            description: "Full view of the case back showing engravings, markings, and overall finish quality.",
+                            tips: ["Capture all text/numbers", "Show finish quality", "Check for authenticity marks"]
+                        },
+                        {
+                            id: "crown_closeup",
+                            title: "Crown Detail",
+                            description: "Close-up of the crown showing logo and craftsmanship details.",
+                            tips: ["Macro shot preferred", "Show logo clearly", "Capture threading detail"]
+                        },
+                        {
+                            id: "bracelet_clasp",
+                            title: "Bracelet & Clasp",
+                            description: "Show the bracelet construction and clasp mechanism with any stamps or markings.",
+                            tips: ["Open clasp if possible", "Show connecting links", "Capture any stamps"]
+                        }
+                    ]
+                },
+                handbag: {
+                    name: "Designer Handbag",
+                    icon: "👜",
+                    steps: [
+                        {
+                            id: "full_front",
+                            title: "Full Front View",
+                            description: "Complete front view of the bag showing shape, proportions, and overall design.",
+                            tips: ["Use neutral background", "Show full silhouette", "Ensure good lighting"]
+                        },
+                        {
+                            id: "logo_hardware",
+                            title: "Logo & Hardware",
+                            description: "Close-up of main logo and metal hardware showing quality and finish.",
+                            tips: ["Macro mode for detail", "Check logo alignment", "Show hardware finish"]
+                        },
+                        {
+                            id: "interior_label",
+                            title: "Interior Label",
+                            description: "Interior authenticity label, serial number, and date code if present.",
+                            tips: ["Use flash if needed", "Capture all text", "Show stitching quality"]
+                        },
+                        {
+                            id: "stitching_detail",
+                            title: "Stitching Quality",
+                            description: "Close-up of stitching showing craftsmanship and thread quality.",
+                            tips: ["Focus on critical seams", "Show stitch consistency", "Capture thread color"]
+                        },
+                        {
+                            id: "base_feet",
+                            title: "Base & Feet",
+                            description: "Bottom of bag showing protective feet, wear patterns, and construction.",
+                            tips: ["Show all protective elements", "Capture wear honestly", "Check construction"]
+                        }
+                    ]
+                },
+                jewelry: {
+                    name: "Fine Jewelry",
+                    icon: "💎",
+                    steps: [
+                        {
+                            id: "main_view",
+                            title: "Main View",
+                            description: "Primary view showing the piece's overall design and proportions.",
+                            tips: ["Use jewelry background", "Show true color", "Avoid harsh shadows"]
+                        },
+                        {
+                            id: "hallmarks",
+                            title: "Hallmarks & Stamps",
+                            description: "All maker's marks, purity stamps, and authenticity hallmarks.",
+                            tips: ["Use magnification", "Ensure sharp focus", "Capture all marks"]
+                        },
+                        {
+                            id: "stone_detail",
+                            title: "Stone Details",
+                            description: "Close-up of main stones showing cut, clarity, and setting quality.",
+                            tips: ["Use macro lens", "Show facet quality", "Capture inclusions if visible"]
+                        },
+                        {
+                            id: "clasp_mechanism",
+                            title: "Clasp/Closure",
+                            description: "Mechanism showing quality and any additional markings.",
+                            tips: ["Show open and closed", "Capture spring quality", "Check for stamps"]
+                        }
+                    ]
+                }
+            };
+
+            const startCamera = useCallback(async () => {
+                try {
+                    // Check if we're in a secure context and have camera access
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        // Fallback: simulate camera for demo purposes
+                        setIsCapturing(true);
+                        return;
+                    }
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        }
+                    });
+                    
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        streamRef.current = stream;
+                    }
+                    setIsCapturing(true);
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    // Fallback: simulate camera for demo purposes
+                    setIsCapturing(true);
+                }
+            }, []);
+
+            const stopCamera = useCallback(() => {
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                    streamRef.current = null;
+                }
+                setIsCapturing(false);
+            }, []);
+
+            const capturePhoto = useCallback(() => {
+                const currentStepId = itemCategories[selectedCategory].steps[currentStep].id;
+                const currentStepData = itemCategories[selectedCategory].steps[currentStep];
+                
+                // If we have a real camera stream
+                if (videoRef.current && canvasRef.current && streamRef.current) {
+                    const canvas = canvasRef.current;
+                    const video = videoRef.current;
+                    const context = canvas.getContext('2d');
+
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    context.drawImage(video, 0, 0);
+
+                    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                    setCapturedPhotos(prev => ({
+                        ...prev,
+                        [currentStepId]: imageData
+                    }));
+                } else {
+                    // Fallback: create a simulated photo for demo
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 640;
+                    canvas.height = 480;
+                    const context = canvas.getContext('2d');
+                    
+                    // Create a gradient background
+                    const gradient = context.createLinearGradient(0, 0, 640, 480);
+                    gradient.addColorStop(0, '#1e293b');
+                    gradient.addColorStop(1, '#0f172a');
+                    context.fillStyle = gradient;
+                    context.fillRect(0, 0, 640, 480);
+                    
+                    // Add some text to simulate photo content
+                    context.fillStyle = '#64748b';
+                    context.font = '24px Arial';
+                    context.textAlign = 'center';
+                    context.fillText(`Demo Photo: ${currentStepData.title}`, 320, 200);
+                    context.font = '16px Arial';
+                    context.fillText('This is a simulated photo for demonstration', 320, 240);
+                    context.fillText(`Step ${currentStep + 1} of ${itemCategories[selectedCategory].steps.length}`, 320, 280);
+                    
+                    // Add a border
+                    context.strokeStyle = '#3b82f6';
+                    context.lineWidth = 4;
+                    context.strokeRect(2, 2, 636, 476);
+                    
+                    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                    setCapturedPhotos(prev => ({
+                        ...prev,
+                        [currentStepId]: imageData
+                    }));
+                }
+
+                stopCamera();
+            }, [selectedCategory, currentStep, stopCamera]);
+
+            const retakePhoto = useCallback(() => {
+                const currentStepId = itemCategories[selectedCategory].steps[currentStep].id;
+                setCapturedPhotos(prev => {
+                    const updated = { ...prev };
+                    delete updated[currentStepId];
+                    return updated;
+                });
+                startCamera();
+            }, [selectedCategory, currentStep, startCamera]);
+
+            if (!selectedCategory) {
+                return React.createElement('div', { className: "min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white" },
+                    React.createElement('div', { className: "container mx-auto px-4 py-8" },
+                        React.createElement('div', { className: "text-center mb-12" },
+                            React.createElement('div', { className: "flex items-center justify-center mb-6" },
+                                React.createElement(Camera, { className: "w-12 h-12 text-blue-400 mr-4" }),
+                                React.createElement('h1', { className: "text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent" },
+                                    "AuthentiCapture"
+                                )
+                            ),
+                            React.createElement('p', { className: "text-xl text-slate-300 max-w-2xl mx-auto" },
+                                "Professional photo documentation for luxury item authentication. Get expert-grade images with guided capture."
+                            )
+                        ),
+                        React.createElement('div', { className: "max-w-4xl mx-auto" },
+                            React.createElement('h2', { className: "text-2xl font-semibold mb-8 text-center text-slate-200" },
+                                "Select Item Category"
+                            ),
+                            React.createElement('div', { className: "grid md:grid-cols-3 gap-6" },
+                                Object.entries(itemCategories).map(([key, category]) =>
+                                    React.createElement('div', {
+                                        key: key,
+                                        onClick: () => setSelectedCategory(key),
+                                        className: "bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 cursor-pointer transition-all duration-300 hover:bg-slate-700/50 hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/20 group"
+                                    },
+                                        React.createElement('div', { className: "text-center" },
+                                            React.createElement('div', { className: "text-6xl mb-4 group-hover:scale-110 transition-transform" },
+                                                category.icon
+                                            ),
+                                            React.createElement('h3', { className: "text-xl font-semibold mb-3 text-slate-200 group-hover:text-blue-400 transition-colors" },
+                                                category.name
+                                            ),
+                                            React.createElement('p', { className: "text-slate-400 text-sm mb-4" },
+                                                `${category.steps.length} required photos`
+                                            ),
+                                            React.createElement('div', { className: "flex items-center justify-center text-blue-400" },
+                                                React.createElement('span', { className: "text-sm font-medium" }, "Start Guide"),
+                                                React.createElement(ArrowRight, { className: "w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" })
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+
+            const currentStepData = itemCategories[selectedCategory].steps[currentStep];
+            const currentStepId = currentStepData.id;
+            const isPhotoTaken = capturedPhotos[currentStepId];
+            const totalSteps = itemCategories[selectedCategory].steps.length;
+            const completedSteps = Object.keys(capturedPhotos).length;
+
+            if (isCapturing) {
+                const hasRealCamera = streamRef.current !== null;
+                
+                return React.createElement('div', { className: "min-h-screen bg-black text-white relative" },
+                    hasRealCamera ? 
+                        React.createElement('video', {
+                            ref: videoRef,
+                            autoPlay: true,
+                            playsInline: true,
+                            className: "w-full h-full object-cover"
+                        }) :
+                        React.createElement('div', { className: "w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center" },
+                            React.createElement('div', { className: "text-center" },
+                                React.createElement(Camera, { className: "w-24 h-24 text-blue-400 mx-auto mb-4" }),
+                                React.createElement('h3', { className: "text-2xl font-semibold mb-2" }, "Demo Camera View"),
+                                React.createElement('p', { className: "text-slate-300 mb-6" }, `Simulating camera for ${currentStepData.title}`),
+                                React.createElement('div', { className: "bg-slate-700/50 p-6 rounded-lg max-w-md" },
+                                    React.createElement('p', { className: "text-sm text-slate-300 mb-4" },
+                                        "In a real environment, you would see the live camera feed here. Click capture to create a demo photo."
+                                    )
+                                )
+                            )
+                        ),
+                    
+                    React.createElement('canvas', { ref: canvasRef, className: "hidden" }),
+                    
+                    React.createElement('div', { className: "absolute inset-0 pointer-events-none" },
+                        React.createElement('div', { className: "bg-black/70 backdrop-blur-sm p-4 pointer-events-auto" },
+                            React.createElement('div', { className: "flex items-center justify-between" },
+                                React.createElement('button', {
+                                    onClick: stopCamera,
+                                    className: "flex items-center text-white hover:text-red-400 transition-colors"
+                                },
+                                    React.createElement(X, { className: "w-6 h-6 mr-2" }),
+                                    "Cancel"
+                                ),
+                                React.createElement('div', { className: "text-center" },
+                                    React.createElement('h3', { className: "font-semibold" }, currentStepData.title),
+                                    React.createElement('p', { className: "text-sm text-slate-300" }, `Step ${currentStep + 1} of ${totalSteps}`)
+                                ),
+                                React.createElement('div', { className: "w-20" })
+                            )
+                        ),
+
+                        React.createElement('div', { className: "absolute inset-0 flex items-center justify-center pointer-events-none" },
+                            React.createElement('div', { className: "relative" },
+                                React.createElement('div', { className: "w-64 h-64 border-2 border-blue-400/50 rounded-lg" }),
+                                React.createElement('div', { className: "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8" },
+                                    React.createElement('div', { className: "w-full h-0.5 bg-blue-400 absolute top-1/2 transform -translate-y-1/2" }),
+                                    React.createElement('div', { className: "h-full w-0.5 bg-blue-400 absolute left-1/2 transform -translate-x-1/2" })
+                                )
+                            )
+                        ),
+
+                        React.createElement('div', { className: "absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm p-6 pointer-events-auto" },
+                            React.createElement('div', { className: "text-center mb-4" },
+                                React.createElement('p', { className: "text-lg mb-3" }, currentStepData.description),
+                                React.createElement('div', { className: "flex flex-wrap justify-center gap-2 text-sm text-blue-300" },
+                                    currentStepData.tips.map((tip, index) =>
+                                        React.createElement('span', {
+                                            key: index,
+                                            className: "bg-blue-900/50 px-3 py-1 rounded-full"
+                                        }, tip)
+                                    )
+                                )
+                            ),
+                            
+                            React.createElement('div', { className: "flex justify-center" },
+                                React.createElement('button', {
+                                    onClick: capturePhoto,
+                                    className: "bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95"
+                                },
+                                    React.createElement(Camera, { className: "w-8 h-8" })
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+
+            return React.createElement('div', { className: "min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white" },
+                React.createElement('div', { className: "container mx-auto px-4 py-6" },
+                    React.createElement('div', { className: "flex items-center justify-between mb-8" },
+                        React.createElement('button', {
+                            onClick: () => {
+                                setSelectedCategory(null);
+                                setCurrentStep(0);
+                                setCapturedPhotos({});
+                            },
+                            className: "flex items-center text-slate-300 hover:text-white transition-colors"
+                        },
+                            React.createElement(ArrowLeft, { className: "w-5 h-5 mr-2" }),
+                            "Back to Categories"
+                        ),
+                        
+                        React.createElement('div', { className: "text-center" },
+                            React.createElement('h1', { className: "text-2xl font-bold text-slate-200" },
+                                itemCategories[selectedCategory].name
+                            ),
+                            React.createElement('p', { className: "text-slate-400" }, "Authentication Photos")
+                        ),
+
+                        React.createElement('div', { className: "text-right" },
+                            React.createElement('div', { className: "text-lg font-semibold text-blue-400" },
+                                `${completedSteps}/${totalSteps}`
+                            ),
+                            React.createElement('div', { className: "text-sm text-slate-400" }, "Complete")
+                        )
+                    ),
+
+                    React.createElement('div', { className: "mb-8" },
+                        React.createElement('div', { className: "bg-slate-700 rounded-full h-2 overflow-hidden" },
+                            React.createElement('div', { 
+                                className: "bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-500",
+                                style: { width: `${(completedSteps / totalSteps) * 100}%` }
+                            })
+                        )
+                    ),
+
+                    React.createElement('div', { className: "max-w-2xl mx-auto" },
+                        React.createElement('div', { className: "bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 mb-6" },
+                            React.createElement('div', { className: "flex items-center justify-between mb-6" },
+                                React.createElement('h2', { className: "text-2xl font-semibold text-slate-200" },
+                                    currentStepData.title
+                                ),
+                                React.createElement('div', { className: "flex items-center space-x-2" },
+                                    isPhotoTaken ?
+                                        React.createElement(CheckCircle, { className: "w-6 h-6 text-green-400" }) :
+                                        React.createElement(AlertCircle, { className: "w-6 h-6 text-yellow-400" })
+                                )
+                            ),
+
+                            React.createElement('p', { className: "text-slate-300 mb-6 text-lg leading-relaxed" },
+                                currentStepData.description
+                            ),
+
+                            React.createElement('div', { className: "mb-6" },
+                                React.createElement('h4', { className: "text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wide" },
+                                    "Photo Requirements"
+                                ),
+                                React.createElement('div', { className: "grid grid-cols-2 gap-3" },
+                                    currentStepData.tips.map((tip, index) =>
+                                        React.createElement('div', {
+                                            key: index,
+                                            className: "flex items-center text-sm text-slate-300"
+                                        },
+                                            React.createElement('div', { className: "w-2 h-2 bg-blue-400 rounded-full mr-3 flex-shrink-0" }),
+                                            tip
+                                        )
+                                    )
+                                )
+                            ),
+
+                            React.createElement('div', { className: "text-center" },
+                                isPhotoTaken ? 
+                                    React.createElement('div', { className: "space-y-4" },
+                                        React.createElement('div', { className: "relative inline-block" },
+                                            React.createElement('img', {
+                                                src: capturedPhotos[currentStepId],
+                                                alt: currentStepData.title,
+                                                className: "max-w-full max-h-64 rounded-lg border-2 border-green-400"
+                                            }),
+                                            React.createElement('div', { className: "absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full" },
+                                                React.createElement(Check, { className: "w-4 h-4" })
+                                            )
+                                        ),
+                                        React.createElement('div', { className: "flex justify-center space-x-4" },
+                                            React.createElement('button', {
+                                                onClick: retakePhoto,
+                                                className: "flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                                            },
+                                                React.createElement(RotateCcw, { className: "w-4 h-4 mr-2" }),
+                                                "Retake"
+                                            ),
+                                            React.createElement('button', {
+                                                onClick: () => {
+                                                    const img = new Image();
+                                                    img.src = capturedPhotos[currentStepId];
+                                                    const newWindow = window.open();
+                                                    newWindow.document.write(img.outerHTML);
+                                                },
+                                                className: "flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                            },
+                                                React.createElement(Eye, { className: "w-4 h-4 mr-2" }),
+                                                "View Full Size"
+                                            )
+                                        )
+                                    ) :
+                                    React.createElement('button', {
+                                        onClick: startCamera,
+                                        className: "flex items-center justify-center px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg transition-colors shadow-lg"
+                                    },
+                                        React.createElement(Camera, { className: "w-6 h-6 mr-3" }),
+                                        "Take Photo"
+                                    )
+                            )
+                        ),
+
+                        React.createElement('div', { className: "flex justify-between items-center" },
+                            React.createElement('button', {
+                                onClick: () => setCurrentStep(Math.max(0, currentStep - 1)),
+                                disabled: currentStep === 0,
+                                className: "flex items-center px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg transition-colors"
+                            },
+                                React.createElement(ArrowLeft, { className: "w-4 h-4 mr-2" }),
+                                "Previous"
+                            ),
+
+                            currentStep === totalSteps - 1 ? 
+                                (completedSteps === totalSteps ? 
+                                    React.createElement('button', {
+                                        onClick: () => {
+                                            alert(`Authentication photos complete! ${completedSteps} photos captured for ${itemCategories[selectedCategory].name}.`);
+                                        },
+                                        className: "px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
+                                    }, "Complete Session") :
+                                    React.createElement('div', { className: "px-6 py-3 bg-slate-800 text-slate-400 rounded-lg" },
+                                        "Complete all photos"
+                                    )
+                                ) :
+                                React.createElement('button', {
+                                    onClick: () => setCurrentStep(Math.min(totalSteps - 1, currentStep + 1)),
+                                    className: "flex items-center px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                                },
+                                    "Next",
+                                    React.createElement(ArrowRight, { className: "w-4 h-4 ml-2" })
+                                )
+                        )
+                    ),
+
+                    React.createElement('div', { className: "mt-12 max-w-4xl mx-auto" },
+                        React.createElement('h3', { className: "text-xl font-semibold mb-6 text-slate-200" }, "Photo Checklist"),
+                        React.createElement('div', { className: "grid md:grid-cols-2 lg:grid-cols-3 gap-4" },
+                            itemCategories[selectedCategory].steps.map((step, index) =>
+                                React.createElement('div', {
+                                    key: step.id,
+                                    className: `p-4 rounded-lg border transition-all cursor-pointer ${
+                                        capturedPhotos[step.id]
+                                            ? 'bg-green-900/20 border-green-400 text-green-100'
+                                            : index === currentStep
+                                            ? 'bg-blue-900/20 border-blue-400 text-blue-100'
+                                            : 'bg-slate-800/30 border-slate-600 text-slate-300'
+                                    }`,
+                                    onClick: () => setCurrentStep(index)
+                                },
+                                    React.createElement('div', { className: "flex items-center justify-between mb-2" },
+                                        React.createElement('span', { className: "font-medium" }, step.title),
+                                        capturedPhotos[step.id] ?
+                                            React.createElement(CheckCircle, { className: "w-5 h-5 text-green-400" }) :
+                                            index === currentStep ?
+                                                React.createElement(AlertCircle, { className: "w-5 h-5 text-blue-400" }) :
+                                                React.createElement('div', { className: "w-5 h-5 border-2 border-slate-600 rounded-full" })
+                                    ),
+                                    React.createElement('p', { className: "text-sm opacity-75" }, step.description)
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(LuxuryAuthApp));
+    </script>
+</body>
+</html>
